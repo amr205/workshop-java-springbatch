@@ -1,6 +1,6 @@
-# Paso 7: Spring Data JPA con H2
+# Paso 8: Pruebas unitarias con JUnit 5 y Mockito
 
-Las torres se guardan en una base de datos H2 en memoria y el repositorio pasa a ser una interfaz de Spring Data JPA.
+Se agregan pruebas: unitarias con Mockito para el servicio y una de integración que levanta todo Spring.
 
 ## Pasos del workshop
 
@@ -12,8 +12,8 @@ Las torres se guardan en una base de datos H2 en memoria y el repositorio pasa a
 | 4 | `paso-4-capas` | Estereotipos, capas y @Bean |
 | 5 | `paso-5-scopes` | Scopes de los beans |
 | 6 | `paso-6-configuracion` | Configuración con application.properties y @Value |
-| 7 | `paso-7-jpa` | Spring Data JPA con H2 | ← estás aquí
-| 8 | `paso-8-pruebas` | Pruebas unitarias con JUnit 5 y Mockito |
+| 7 | `paso-7-jpa` | Spring Data JPA con H2 |
+| 8 | `paso-8-pruebas` | Pruebas unitarias con JUnit 5 y Mockito | ← estás aquí
 
 ## Requisitos
 
@@ -23,27 +23,20 @@ Las torres se guardan en una base de datos H2 en memoria y el repositorio pasa a
 
 ## Concepto
 
-**Spring Data JPA** genera la capa de datos por ti. Escribes una **interfaz** que extiende `JpaRepository<Entidad, TipoDelId>` y Spring crea la implementación al arrancar:
+- **JUnit 5**: el framework de pruebas. `@Test` marca una prueba; `assertEquals`, `assertThrows`, etc. verifican resultados.
+- **Mockito**: crea **mocks**, objetos simulados que reemplazan dependencias reales. `when(...).thenReturn(...)` define qué responden y `verify(...)` comprueba que se llamaron.
+- **Patrón AAA**: **A**rrange (preparar datos y mocks), **A**ct (llamar al método), **A**ssert (verificar).
 
-- **CRUD gratis**: `findAll`, `findById`, `save`, `saveAll`, `deleteById`, `count`…
-- **Consultas por nombre de método**: `findByNombre` se convierte en `SELECT ... WHERE nombre = ?`.
-- Paginación, ordenamiento y `@Query` para consultas personalizadas.
+**Por qué un mock del repositorio y no la base de datos real:** la prueba queda **aislada** (prueba solo la lógica del servicio), es **rápida** y es **repetible**. Son las propiedades F.I.R.S.T.: Fast, Isolated, Repeatable, Self-validating, Timely.
 
-Una **entidad** es una clase marcada con `@Entity` que se guarda en una tabla, con su llave primaria marcada con `@Id`. Por debajo, **Hibernate** es la implementación de JPA. **H2** es una base de datos en memoria: se crea al arrancar y se borra al detener la app, ideal para aprender.
+La inyección por constructor (paso 3) es lo que lo hace fácil: `@InjectMocks` crea el `TorreService` pasándole los mocks por su constructor.
 
 ## Qué cambió
 
-| Archivo | Cambio |
-| --- | --- |
-| `pom.xml` | Nuevos `spring-boot-starter-data-jpa` y `h2` (scope `runtime`) |
-| `Torre.java` | Ahora es `@Entity` con `@Id` y `@GeneratedValue` |
-| `TorreRepository.java` | De clase en memoria a **interfaz** `extends JpaRepository<Torre, Long>` con 3 consultas derivadas |
-| `TorreService.java` | Usa las consultas del repositorio. Nuevo `buscarPorNombre` |
-| `AppConfig.java` | Un `@Bean CommandLineRunner` que guarda las 4 torres al arrancar |
-| `TorreController.java` | Nuevo `GET /torres/buscar?nombre=...` |
-| `application.properties` | `spring.jpa.show-sql=true` para ver el SQL generado |
-
-Nota: el controller y casi todo el servicio no cambiaron. Gracias a las capas, cambiar la forma de guardar datos solo tocó la capa de datos.
+| Archivo | Tipo | Qué prueba |
+| --- | --- | --- |
+| `TorreServiceTest.java` | Unitaria (sin Spring) | 4 pruebas del servicio con `TorreRepository` y `Random` simulados |
+| `TorresApplicationTests.java` | Integración (`@SpringBootTest`) | Que el contexto arranca, los beans se conectan y H2 tiene las torres |
 
 ## Desde cero
 
@@ -52,34 +45,37 @@ Nota: el controller y casi todo el servicio no cambiaron. Gracias a las capas, c
 ```bash
 git clone https://github.com/amr205/workshop-java-springbatch.git
 cd workshop-java-springbatch
-git checkout paso-7-jpa
+git checkout paso-8-pruebas
 ```
 
-Si ya lo tienes clonado: `git checkout paso-7-jpa`.
-
-### 2. Arrancar la aplicación
+### 2. Correr las pruebas
 
 ```bash
-mvn spring-boot:run
+mvn test
 ```
 
-La primera vez Maven descarga Spring Boot y sus dependencias, así que tarda unos minutos. Para detener la aplicación: `Ctrl + C`.
+Debe terminar con `Tests run: 5, Failures: 0, Errors: 0` y `BUILD SUCCESS`.
 
-### 3. Probar
+- Las 4 de `TorreServiceTest` corren en milisegundos: no arrancan Spring.
+- `TorresApplicationTests` tarda más porque levanta todo el contexto con la base de datos.
 
-Abre las URLs en el navegador o usa `curl` (en PowerShell escribe `curl.exe`):
+### 3. Prueba esto
 
-```bash
-curl.exe http://localhost:9090/torres
-curl.exe http://localhost:9090/torres/mas-poderosa
-curl.exe http://localhost:9090/torres/buscar?nombre=Mago
-curl.exe http://localhost:9090/juego
-```
+En `aleatoriaUsaElIndiceQueDevuelveRandom`, cambia `thenReturn(1)` por `thenReturn(0)` y corre `mvn test`. La prueba falla porque ahora sale "Arquero": con el mock, el "azar" es predecible.
 
-Ahora las torres tienen un `id` generado por la base de datos. En la consola aparece el SQL de cada consulta, por ejemplo `select ... from torre t1_0 order by t1_0.danio desc fetch first ? rows only`. Nadie escribió ese SQL: salió del nombre `findFirstByOrderByDanioDesc`.
+## Resumen del workshop
+
+| Paso | Concepto | Anotaciones clave |
+| --- | --- | --- |
+| 1 | Spring Boot | `@SpringBootApplication` |
+| 2 | IoC y beans | `@Service`, `ApplicationContext` |
+| 3 | Inyección de dependencias | Constructor, `@RestController`, `@GetMapping` |
+| 4 | Capas y `@Bean` | `@Repository`, `@Configuration`, `@Bean` |
+| 5 | Scopes | `@Scope("prototype")`, `@RequestScope` |
+| 6 | Configuración | `application.properties`, `@Value` |
+| 7 | Spring Data JPA | `@Entity`, `@Id`, `JpaRepository` |
+| 8 | Pruebas | `@Test`, `@Mock`, `@InjectMocks`, `@SpringBootTest` |
 
 ## Pregunta para la clase
 
-¿Qué te da extender `JpaRepository`? ¿Qué SQL crees que genera `findByCostoLessThanEqual`?
-
-Siguiente paso: `git checkout paso-8-pruebas`
+En un test de `TorreService`, ¿por qué usar un mock del repositorio en lugar de la base de datos real?
