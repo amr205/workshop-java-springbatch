@@ -1,6 +1,6 @@
-# Paso 3: Inyección de dependencias por constructor
+# Paso 4: Estereotipos, capas y @Bean
 
-Un controlador recibe el servicio que necesita sin crearlo: Spring se lo inyecta.
+La aplicación se organiza en tres capas, cada una con su anotación, y aparece `@Bean` para registrar una clase que no es nuestra.
 
 ## Pasos del workshop
 
@@ -8,8 +8,8 @@ Un controlador recibe el servicio que necesita sin crearlo: Spring se lo inyecta
 | --- | --- | --- |
 | 1 | `paso-1-spring-boot` | Spring Boot: la aplicación mínima |
 | 2 | `paso-2-beans` | Contenedor IoC y beans |
-| 3 | `paso-3-inyeccion` | Inyección de dependencias por constructor | ← estás aquí
-| 4 | `paso-4-capas` | Estereotipos, capas y @Bean |
+| 3 | `paso-3-inyeccion` | Inyección de dependencias por constructor |
+| 4 | `paso-4-capas` | Estereotipos, capas y @Bean | ← estás aquí
 | 5 | `paso-5-scopes` | Scopes de los beans |
 | 6 | `paso-6-configuracion` | Configuración con application.properties y @Value |
 | 7 | `paso-7-jpa` | Spring Data JPA con H2 |
@@ -23,27 +23,28 @@ Un controlador recibe el servicio que necesita sin crearlo: Spring se lo inyecta
 
 ## Concepto
 
-La **inyección de dependencias (DI)** es la forma en que Spring aplica IoC: un bean **recibe** sus dependencias desde afuera en lugar de crearlas. Hay tres formas:
+`@Service`, `@Repository` y `@Controller` son **especializaciones de `@Component`**: todas registran un bean igual. La diferencia es el **significado**: indican a qué capa pertenece la clase.
 
-| Forma | Ejemplo | ¿Recomendada? |
-| --- | --- | --- |
-| **Constructor** | `public TorreController(TorreService s) { ... }` | **Sí** |
-| Setter | `@Autowired public void setServicio(TorreService s)` | Para dependencias opcionales |
-| Campo | `@Autowired private TorreService servicio;` | No |
+```
+HTTP ──▶ @RestController ──▶ @Service ──▶ @Repository ──▶ datos
+         TorreController      TorreService   TorreRepository
+         (capa web)           (negocio)      (datos)
+```
 
-**Por qué por constructor:**
+- **Controller**: recibe la petición HTTP y delega. No tiene lógica de negocio.
+- **Service**: las reglas del negocio. No sabe de HTTP ni de cómo se guardan los datos.
+- **Repository**: el acceso a datos. `@Repository` además traduce excepciones de base de datos a las de Spring.
 
-- El campo puede ser `final`: nunca cambia y **nunca es null**. Si falta la dependencia, la app falla al arrancar, no después.
-- Las dependencias se ven en la firma del constructor.
-- **Se prueba fácil**: en un test haces `new TorreController(servicioFalso)` sin levantar Spring.
-
-Si la clase tiene **un solo constructor**, ni siquiera hace falta `@Autowired`: Spring lo usa automáticamente.
+**`@Bean`**: ¿y si necesitas como bean una clase que no puedes anotar, como `java.util.Random` del JDK o una clase de otra librería? Escribes un método con `@Bean` dentro de una clase `@Configuration`; lo que devuelve el método se registra como bean.
 
 ## Qué cambió
 
 | Archivo | Cambio |
 | --- | --- |
-| `TorreController.java` | Nuevo: `@RestController` que recibe `TorreService` por constructor. Endpoints `GET /torres` y `GET /torres/mas-poderosa` |
+| `TorreRepository.java` | Nuevo: `@Repository` con las torres en memoria |
+| `TorreService.java` | Ya no tiene la lista: recibe `TorreRepository` y `Random` por constructor. Nuevo método `aleatoria()` |
+| `AppConfig.java` | Nuevo: `@Configuration` con un `@Bean` que crea el `Random` |
+| `TorreController.java` | Nuevo endpoint `GET /torres/aleatoria` |
 
 ## Desde cero
 
@@ -52,10 +53,10 @@ Si la clase tiene **un solo constructor**, ni siquiera hace falta `@Autowired`: 
 ```bash
 git clone https://github.com/amr205/workshop-java-springbatch.git
 cd workshop-java-springbatch
-git checkout paso-3-inyeccion
+git checkout paso-4-capas
 ```
 
-Si ya lo tienes clonado: `git checkout paso-3-inyeccion`.
+Si ya lo tienes clonado: `git checkout paso-4-capas`.
 
 ### 2. Arrancar la aplicación
 
@@ -71,17 +72,13 @@ Abre las URLs en el navegador o usa `curl` (en PowerShell escribe `curl.exe`):
 
 ```bash
 curl.exe http://localhost:8080/torres
-curl.exe http://localhost:8080/torres/mas-poderosa
+curl.exe http://localhost:8080/torres/aleatoria
 ```
 
-`/torres` devuelve las 4 torres en JSON. Spring convierte la lista de Java a JSON automáticamente con Jackson, que viene en el starter web.
-
-## Prueba esto
-
-Cambia el constructor por un campo con `new TorreService()` y arranca: verás **dos** mensajes `>> Spring creo un TorreService`, porque ahora hay dos objetos (el de Spring y el tuyo). Regresa al constructor.
+`/torres/aleatoria` devuelve una torre distinta casi cada vez. En la consola, la lista de beans ahora incluye `appConfig`, `random` (creado por el método `@Bean`) y `torreRepository`.
 
 ## Pregunta para la clase
 
-¿Por qué se recomienda la inyección por constructor en lugar de `@Autowired` en el campo?
+¿Qué diferencia hay entre `@Component`, `@Service`, `@Repository` y `@Controller`?
 
-Siguiente paso: `git checkout paso-4-capas`
+Siguiente paso: `git checkout paso-5-scopes`

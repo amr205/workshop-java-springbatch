@@ -25,4 +25,9 @@ public class TorreController {
     public Torre masPoderosa() {
         return torreService.masPoderosa();
     }
+
+    @GetMapping("/torres/aleatoria")
+    public Torre aleatoria() {
+        return torreService.aleatoria();
+    }
 }
