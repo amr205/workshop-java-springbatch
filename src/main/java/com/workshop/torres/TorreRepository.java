@@ -1,23 +1,22 @@
 package com.workshop.torres;
 
 import java.util.List;
+import java.util.Optional;
 
-import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
- * Capa de datos. Por ahora guarda las torres en memoria;
- * en el paso 7 se cambia por una base de datos real con JPA.
+ * Solo una interfaz: Spring Data JPA genera la implementacion al arrancar.
+ * JpaRepository ya trae findAll, findById, save, deleteById, count...
  */
-@Repository
-public class TorreRepository {
+public interface TorreRepository extends JpaRepository<Torre, Long> {
 
-    private final List<Torre> torres = List.of(
-            new Torre("Arquero", 10, 100),
-            new Torre("Canon", 35, 250),
-            new Torre("Mago", 25, 200),
-            new Torre("Laser", 50, 400));
+    // SELECT ... FROM torre WHERE nombre = ?
+    List<Torre> findByNombre(String nombre);
 
-    public List<Torre> findAll() {
-        return torres;
-    }
+    // SELECT ... FROM torre WHERE costo <= ?
+    List<Torre> findByCostoLessThanEqual(int presupuesto);
+
+    // SELECT ... FROM torre ORDER BY danio DESC LIMIT 1
+    Optional<Torre> findFirstByOrderByDanioDesc();
 }

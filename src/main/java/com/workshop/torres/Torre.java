@@ -1,10 +1,18 @@
 package com.workshop.torres;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+
 /**
- * Una torre del Tower Defense. Es un objeto Java normal (POJO).
+ * Entidad JPA: Hibernate la guarda en la tabla TORRE.
  */
+@Entity
 public class Torre {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String nombre;
     private int danio;

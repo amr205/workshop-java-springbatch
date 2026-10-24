@@ -3,6 +3,7 @@ package com.workshop.torres;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -24,6 +25,11 @@ public class TorreController {
     @GetMapping("/torres/mas-poderosa")
     public Torre masPoderosa() {
         return torreService.masPoderosa();
+    }
+
+    @GetMapping("/torres/buscar")
+    public List<Torre> buscar(@RequestParam String nombre) {
+        return torreService.buscarPorNombre(nombre);
     }
 
     @GetMapping("/torres/aleatoria")

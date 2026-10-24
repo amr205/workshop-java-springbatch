@@ -1,13 +1,12 @@
 package com.workshop.torres;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 
 import org.springframework.stereotype.Service;
 
 /**
- * Capa de negocio: aqui viven las reglas. No sabe de HTTP ni de como se guardan los datos.
+ * Capa de negocio. Ahora delega las consultas al repositorio JPA.
  */
 @Service
 public class TorreService {
@@ -26,15 +25,16 @@ public class TorreService {
     }
 
     public Torre masPoderosa() {
-        return torreRepository.findAll().stream()
-                .max(Comparator.comparingInt(Torre::getDanio))
+        return torreRepository.findFirstByOrderByDanioDesc()
                 .orElseThrow(() -> new IllegalStateException("No hay torres"));
     }
 
     public List<Torre> alcanzables(int presupuesto) {
-        return torreRepository.findAll().stream()
-                .filter(t -> t.getCosto() <= presupuesto)
-                .toList();
+        return torreRepository.findByCostoLessThanEqual(presupuesto);
+    }
+
+    public List<Torre> buscarPorNombre(String nombre) {
+        return torreRepository.findByNombre(nombre);
     }
 
     public Torre aleatoria() {

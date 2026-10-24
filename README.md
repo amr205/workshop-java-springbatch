@@ -1,6 +1,6 @@
-# Paso 6: Configuración con application.properties y @Value
+# Paso 7: Spring Data JPA con H2
 
-Valores que antes estaban escritos en el código pasan a `application.properties`.
+Las torres se guardan en una base de datos H2 en memoria y el repositorio pasa a ser una interfaz de Spring Data JPA.
 
 ## Pasos del workshop
 
@@ -11,8 +11,8 @@ Valores que antes estaban escritos en el código pasan a `application.properties
 | 3 | `paso-3-inyeccion` | Inyección de dependencias por constructor |
 | 4 | `paso-4-capas` | Estereotipos, capas y @Bean |
 | 5 | `paso-5-scopes` | Scopes de los beans |
-| 6 | `paso-6-configuracion` | Configuración con application.properties y @Value | ← estás aquí
-| 7 | `paso-7-jpa` | Spring Data JPA con H2 |
+| 6 | `paso-6-configuracion` | Configuración con application.properties y @Value |
+| 7 | `paso-7-jpa` | Spring Data JPA con H2 | ← estás aquí
 | 8 | `paso-8-pruebas` | Pruebas unitarias con JUnit 5 y Mockito |
 
 ## Requisitos
@@ -23,26 +23,27 @@ Valores que antes estaban escritos en el código pasan a `application.properties
 
 ## Concepto
 
-`src/main/resources/application.properties` guarda configuración como `clave=valor`. Hay dos tipos de propiedades:
+**Spring Data JPA** genera la capa de datos por ti. Escribes una **interfaz** que extiende `JpaRepository<Entidad, TipoDelId>` y Spring crea la implementación al arrancar:
 
-- **De Spring Boot**, como `server.port`, que cambia el puerto de Tomcat (por defecto 8080).
-- **Propias**, como `juego.nombre`, que se leen con `@Value("${juego.nombre}")`.
+- **CRUD gratis**: `findAll`, `findById`, `save`, `saveAll`, `deleteById`, `count`…
+- **Consultas por nombre de método**: `findByNombre` se convierte en `SELECT ... WHERE nombre = ?`.
+- Paginación, ordenamiento y `@Query` para consultas personalizadas.
 
-**Ventajas:**
-
-- Cambiar valores **sin recompilar**.
-- Tener valores distintos por ambiente (desarrollo, pruebas, producción).
-- Sobrescribirlos al arrancar: los argumentos de línea de comandos **ganan** sobre el archivo.
+Una **entidad** es una clase marcada con `@Entity` que se guarda en una tabla, con su llave primaria marcada con `@Id`. Por debajo, **Hibernate** es la implementación de JPA. **H2** es una base de datos en memoria: se crea al arrancar y se borra al detener la app, ideal para aprender.
 
 ## Qué cambió
 
 | Archivo | Cambio |
 | --- | --- |
-| `application.properties` | `server.port=9090`, `juego.nombre` y `juego.presupuesto-inicial` |
-| `JuegoController.java` | Nuevo: lee las dos propiedades con `@Value` en el constructor. Endpoint `GET /juego` |
-| `TorreService.java` | Nuevo método `alcanzables(presupuesto)` |
+| `pom.xml` | Nuevos `spring-boot-starter-data-jpa` y `h2` (scope `runtime`) |
+| `Torre.java` | Ahora es `@Entity` con `@Id` y `@GeneratedValue` |
+| `TorreRepository.java` | De clase en memoria a **interfaz** `extends JpaRepository<Torre, Long>` con 3 consultas derivadas |
+| `TorreService.java` | Usa las consultas del repositorio. Nuevo `buscarPorNombre` |
+| `AppConfig.java` | Un `@Bean CommandLineRunner` que guarda las 4 torres al arrancar |
+| `TorreController.java` | Nuevo `GET /torres/buscar?nombre=...` |
+| `application.properties` | `spring.jpa.show-sql=true` para ver el SQL generado |
 
-**Ojo: desde este paso la app corre en el puerto 9090.**
+Nota: el controller y casi todo el servicio no cambiaron. Gracias a las capas, cambiar la forma de guardar datos solo tocó la capa de datos.
 
 ## Desde cero
 
@@ -51,10 +52,10 @@ Valores que antes estaban escritos en el código pasan a `application.properties
 ```bash
 git clone https://github.com/amr205/workshop-java-springbatch.git
 cd workshop-java-springbatch
-git checkout paso-6-configuracion
+git checkout paso-7-jpa
 ```
 
-Si ya lo tienes clonado: `git checkout paso-6-configuracion`.
+Si ya lo tienes clonado: `git checkout paso-7-jpa`.
 
 ### 2. Arrancar la aplicación
 
@@ -69,27 +70,16 @@ La primera vez Maven descarga Spring Boot y sus dependencias, así que tarda uno
 Abre las URLs en el navegador o usa `curl` (en PowerShell escribe `curl.exe`):
 
 ```bash
+curl.exe http://localhost:9090/torres
+curl.exe http://localhost:9090/torres/mas-poderosa
+curl.exe http://localhost:9090/torres/buscar?nombre=Mago
 curl.exe http://localhost:9090/juego
 ```
 
-Respuesta: el nombre del juego, el presupuesto (250) y las torres que cuestan 250 o menos.
-
-### 4. Sobrescribir propiedades al arrancar
-
-Detén la app y arráncala con otros valores:
-
-```bash
-mvn spring-boot:run -Dspring-boot.run.arguments="--server.port=8081 --juego.presupuesto-inicial=400"
-```
-```powershell
-# Windows PowerShell: comillas alrededor de todo el argumento -D
-mvn spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081 --juego.presupuesto-inicial=400"
-```
-
-Ahora responde en `http://localhost:8081/juego` y con 400 alcanzan las 4 torres. Con el JAR sería: `java -jar target/torres-spring-0.0.1-SNAPSHOT.jar --server.port=8081`.
+Ahora las torres tienen un `id` generado por la base de datos. En la consola aparece el SQL de cada consulta, por ejemplo `select ... from torre t1_0 order by t1_0.danio desc fetch first ? rows only`. Nadie escribió ese SQL: salió del nombre `findFirstByOrderByDanioDesc`.
 
 ## Pregunta para la clase
 
-¿Qué ganas al poner configuración en `application.properties` en lugar de en el código?
+¿Qué te da extender `JpaRepository`? ¿Qué SQL crees que genera `findByCostoLessThanEqual`?
 
-Siguiente paso: `git checkout paso-7-jpa`
+Siguiente paso: `git checkout paso-8-pruebas`
