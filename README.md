@@ -1,6 +1,6 @@
-# Paso 5: Scopes de los beans
+# Paso 6: Configuración con application.properties y @Value
 
-Un endpoint muestra cómo se comporta cada scope (alcance) de un bean.
+Valores que antes estaban escritos en el código pasan a `application.properties`.
 
 ## Pasos del workshop
 
@@ -10,8 +10,8 @@ Un endpoint muestra cómo se comporta cada scope (alcance) de un bean.
 | 2 | `paso-2-beans` | Contenedor IoC y beans |
 | 3 | `paso-3-inyeccion` | Inyección de dependencias por constructor |
 | 4 | `paso-4-capas` | Estereotipos, capas y @Bean |
-| 5 | `paso-5-scopes` | Scopes de los beans | ← estás aquí
-| 6 | `paso-6-configuracion` | Configuración con application.properties y @Value |
+| 5 | `paso-5-scopes` | Scopes de los beans |
+| 6 | `paso-6-configuracion` | Configuración con application.properties y @Value | ← estás aquí
 | 7 | `paso-7-jpa` | Spring Data JPA con H2 |
 | 8 | `paso-8-pruebas` | Pruebas unitarias con JUnit 5 y Mockito |
 
@@ -23,25 +23,26 @@ Un endpoint muestra cómo se comporta cada scope (alcance) de un bean.
 
 ## Concepto
 
-El **scope** decide cuántas instancias de un bean existen:
+`src/main/resources/application.properties` guarda configuración como `clave=valor`. Hay dos tipos de propiedades:
 
-| Scope | Instancias | Cómo se declara |
-| --- | --- | --- |
-| **singleton** (por defecto) | Una para toda la aplicación, compartida | Nada, o `@Scope("singleton")` |
-| prototype | Una nueva cada vez que se pide | `@Scope("prototype")` |
-| request | Una por petición HTTP | `@RequestScope` |
-| session | Una por sesión de usuario | `@SessionScope` |
+- **De Spring Boot**, como `server.port`, que cambia el puerto de Tomcat (por defecto 8080).
+- **Propias**, como `juego.nombre`, que se leen con `@Value("${juego.nombre}")`.
+
+**Ventajas:**
+
+- Cambiar valores **sin recompilar**.
+- Tener valores distintos por ambiente (desarrollo, pruebas, producción).
+- Sobrescribirlos al arrancar: los argumentos de línea de comandos **ganan** sobre el archivo.
 
 ## Qué cambió
 
-Paquete nuevo `com.workshop.torres.scopes`:
-
-| Archivo | Scope |
+| Archivo | Cambio |
 | --- | --- |
-| `ContadorSingleton.java` | singleton |
-| `ContadorPrototype.java` | prototype |
-| `ContadorPeticion.java` | request |
-| `ScopeController.java` | `GET /scopes`: incrementa cada contador y devuelve los valores |
+| `application.properties` | `server.port=9090`, `juego.nombre` y `juego.presupuesto-inicial` |
+| `JuegoController.java` | Nuevo: lee las dos propiedades con `@Value` en el constructor. Endpoint `GET /juego` |
+| `TorreService.java` | Nuevo método `alcanzables(presupuesto)` |
+
+**Ojo: desde este paso la app corre en el puerto 9090.**
 
 ## Desde cero
 
@@ -50,10 +51,10 @@ Paquete nuevo `com.workshop.torres.scopes`:
 ```bash
 git clone https://github.com/amr205/workshop-java-springbatch.git
 cd workshop-java-springbatch
-git checkout paso-5-scopes
+git checkout paso-6-configuracion
 ```
 
-Si ya lo tienes clonado: `git checkout paso-5-scopes`.
+Si ya lo tienes clonado: `git checkout paso-6-configuracion`.
 
 ### 2. Arrancar la aplicación
 
@@ -68,28 +69,27 @@ La primera vez Maven descarga Spring Boot y sus dependencias, así que tarda uno
 Abre las URLs en el navegador o usa `curl` (en PowerShell escribe `curl.exe`):
 
 ```bash
-curl.exe http://localhost:8080/scopes
+curl.exe http://localhost:9090/juego
 ```
 
-Llámalo **3 veces** y compara:
+Respuesta: el nombre del juego, el presupuesto (250) y las torres que cuestan 250 o menos.
 
-| Llamada | `singleton` | `prototypeInyectado` | `prototypeNuevo` | `peticion` |
-| --- | --- | --- | --- | --- |
-| 1 | 1 | 1 | 1 | 2 |
-| 2 | 2 | 2 | 1 | 2 |
-| 3 | 3 | 3 | 1 | 2 |
+### 4. Sobrescribir propiedades al arrancar
 
-- **singleton** crece: todos los usuarios comparten la misma instancia.
-- **prototypeInyectado** también crece. Es la trampa: el controller es singleton y se creó una sola vez, así que el prototype se le inyectó **una sola vez**.
-- **prototypeNuevo** siempre vale 1: con `ObjectProvider.getObject()` pedimos una instancia nueva en cada llamada.
-- **peticion** siempre vale 2: se incrementa dos veces dentro de la misma petición (misma instancia) y en la siguiente petición empieza de cero.
+Detén la app y arráncala con otros valores:
 
-## La lección: los singletons no deben guardar estado
+```bash
+mvn spring-boot:run -Dspring-boot.run.arguments="--server.port=8081 --juego.presupuesto-inicial=400"
+```
+```powershell
+# Windows PowerShell: comillas alrededor de todo el argumento -D
+mvn spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081 --juego.presupuesto-inicial=400"
+```
 
-Si dos usuarios llaman a la vez a un singleton que guarda un contador en un campo, los dos leen 5, los dos escriben 6 y se pierde un incremento: una **condición de carrera**. Por eso los servicios deben ser **sin estado**: los datos van en parámetros, variables locales o la base de datos.
+Ahora responde en `http://localhost:8081/juego` y con 400 alcanzan las 4 torres. Con el JAR sería: `java -jar target/torres-spring-0.0.1-SNAPSHOT.jar --server.port=8081`.
 
 ## Pregunta para la clase
 
-Un bean singleton guarda un contador en un atributo. ¿Qué pasa si dos usuarios lo llaman al mismo tiempo?
+¿Qué ganas al poner configuración en `application.properties` en lugar de en el código?
 
-Siguiente paso: `git checkout paso-6-configuracion`
+Siguiente paso: `git checkout paso-7-jpa`

@@ -31,6 +31,12 @@ public class TorreService {
                 .orElseThrow(() -> new IllegalStateException("No hay torres"));
     }
 
+    public List<Torre> alcanzables(int presupuesto) {
+        return torreRepository.findAll().stream()
+                .filter(t -> t.getCosto() <= presupuesto)
+                .toList();
+    }
+
     public Torre aleatoria() {
         List<Torre> torres = torreRepository.findAll();
         return torres.get(random.nextInt(torres.size()));
