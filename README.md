@@ -1,13 +1,13 @@
-# Paso 1: Spring Boot: la aplicación mínima
+# Paso 2: Contenedor IoC y beans
 
-Workshop de Spring Boot paso a paso con el tema del Tower Defense. Cada rama agrega **un concepto**. Este es el punto de partida: la aplicación Spring Boot más pequeña que responde por HTTP.
+Ahora el contenedor de Spring crea un objeto por nosotros y lo hacemos visible en la consola.
 
 ## Pasos del workshop
 
 | Paso | Rama | Concepto |
 | --- | --- | --- |
-| 1 | `paso-1-spring-boot` | Spring Boot: la aplicación mínima | ← estás aquí
-| 2 | `paso-2-beans` | Contenedor IoC y beans |
+| 1 | `paso-1-spring-boot` | Spring Boot: la aplicación mínima |
+| 2 | `paso-2-beans` | Contenedor IoC y beans | ← estás aquí
 | 3 | `paso-3-inyeccion` | Inyección de dependencias por constructor |
 | 4 | `paso-4-capas` | Estereotipos, capas y @Bean |
 | 5 | `paso-5-scopes` | Scopes de los beans |
@@ -23,26 +23,17 @@ Workshop de Spring Boot paso a paso con el tema del Tower Defense. Cada rama agr
 
 ## Concepto
 
-**Spring Boot** es una capa sobre Spring que permite arrancar una aplicación con casi nada de configuración. Hace cuatro cosas por ti:
+**Inversión de control (IoC)**: en Java "normal" tú creas los objetos con `new`. En Spring, el **contenedor IoC** (`ApplicationContext`) los crea, los configura, los conecta y los destruye. Tu código solo declara qué necesita.
 
-1. **Starters**: una dependencia trae un conjunto completo de librerías compatibles. Aquí usamos `spring-boot-starter-webmvc` (Spring MVC, JSON y Tomcat).
-2. **Autoconfiguración**: revisa qué hay en el classpath y lo configura con valores razonables. Ve Tomcat, así que levanta un servidor web.
-3. **Servidor embebido**: Tomcat corre *dentro* de tu aplicación; no se instala aparte.
-4. **JAR ejecutable**: `mvn package` crea un JAR que se corre con `java -jar`.
+Un **bean** es un objeto Java normal **creado y gestionado por el contenedor**. Para que Spring cree un bean de una clase, se anota con `@Component` o una de sus variantes (`@Service`, `@Repository`, `@Controller`).
 
-La clase principal lleva `@SpringBootApplication`, que junta tres anotaciones:
+## Qué cambió
 
-- `@Configuration`: la clase puede definir beans.
-- `@EnableAutoConfiguration`: activa la autoconfiguración.
-- `@ComponentScan`: busca componentes en **este paquete y sus subpaquetes**.
-
-## Qué hay en este paso
-
-| Archivo | Qué hace |
+| Archivo | Cambio |
 | --- | --- |
-| `pom.xml` | Hereda de `spring-boot-starter-parent` 4.0.5 y usa el starter web |
-| `TorresApplication.java` | Clase principal con `@SpringBootApplication` y `SpringApplication.run(...)` |
-| `HolaController.java` | Un endpoint `GET /hola` para comprobar que Tomcat responde |
+| `Torre.java` | Nuevo: una torre (nombre, daño, costo) |
+| `TorreService.java` | Nuevo: `@Service` con 4 torres. Su constructor imprime un mensaje |
+| `TorresApplication.java` | Guarda el `ApplicationContext` que devuelve `run(...)`, lista los beans de nuestro paquete y le pide el `TorreService` al contenedor |
 
 ## Desde cero
 
@@ -51,10 +42,10 @@ La clase principal lleva `@SpringBootApplication`, que junta tres anotaciones:
 ```bash
 git clone https://github.com/amr205/workshop-java-springbatch.git
 cd workshop-java-springbatch
-git checkout paso-1-spring-boot
+git checkout paso-2-beans
 ```
 
-Si ya lo tienes clonado: `git checkout paso-1-spring-boot`.
+Si ya lo tienes clonado: `git checkout paso-2-beans`.
 
 ### 2. Arrancar la aplicación
 
@@ -64,20 +55,25 @@ mvn spring-boot:run
 
 La primera vez Maven descarga Spring Boot y sus dependencias, así que tarda unos minutos. Para detener la aplicación: `Ctrl + C`.
 
-En la consola debe aparecer algo como `Tomcat started on port 8080`.
+### 3. Qué observar en la consola
 
-### 3. Probar
-
-Abre las URLs en el navegador o usa `curl` (en PowerShell escribe `curl.exe`):
-
-```bash
-curl.exe http://localhost:8080/hola
+```
+>> Spring creo un TorreService
+...
+== Beans creados por Spring en nuestro paquete ==
+ - torresApplication -> TorresApplication$$SpringCGLIB$$0
+ - holaController -> HolaController
+ - torreService -> TorreService
+Torre mas poderosa: Torre[nombre=Laser, danio=50, costo=400]
+Es la misma instancia? true
 ```
 
-Respuesta: `Hola desde Spring Boot`.
+- Nunca escribimos `new TorreService()`, pero el mensaje del constructor aparece: **lo creó Spring** al arrancar.
+- Cada bean tiene un nombre: el de la clase con la primera letra en minúscula.
+- Pedimos el bean dos veces y es **el mismo objeto**: por defecto los beans son *singleton* (lo vemos a fondo en el paso 5).
 
 ## Pregunta para la clase
 
-¿Qué tuvimos que instalar para tener un servidor web? Nada: Tomcat vino dentro del starter. ¿Qué pasaría si moviéramos `HolaController` a un paquete `com.otro`? Spring no lo encontraría (`@ComponentScan` solo busca en `com.workshop.torres` y sus subpaquetes) y `/hola` daría 404.
+Explica IoC con tus palabras: ¿quién crea los objetos en Java normal y quién en Spring?
 
-Siguiente paso: `git checkout paso-2-beans`
+Siguiente paso: `git checkout paso-3-inyeccion`
