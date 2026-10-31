@@ -1,6 +1,6 @@
-# Paso 9: Diseño de una API REST (CRUD, códigos HTTP)
+# Paso 10: DTOs, validación y errores con estructura
 
-Las rutas sueltas (`/torres`, `/torres/aleatoria`) se convierten en una API REST bien diseñada, con CRUD completo y los códigos HTTP correctos.
+La API deja de exponer la entidad, valida lo que recibe y responde cada error con un JSON consistente.
 
 ## Pasos del workshop
 
@@ -14,8 +14,8 @@ Las rutas sueltas (`/torres`, `/torres/aleatoria`) se convierten en una API REST
 | 6 | `paso-6-configuracion` | Configuración con application.properties y @Value |
 | 7 | `paso-7-jpa` | Spring Data JPA con H2 |
 | 8 | `paso-8-pruebas` | Pruebas unitarias con JUnit 5 y Mockito |
-| 9 | `paso-9-api-rest` | Diseño de una API REST (CRUD, códigos HTTP) | ← estás aquí
-| 10 | `paso-10-dtos-y-errores` | DTOs, validación y errores con estructura |
+| 9 | `paso-9-api-rest` | Diseño de una API REST (CRUD, códigos HTTP) |
+| 10 | `paso-10-dtos-y-errores` | DTOs, validación y errores con estructura | ← estás aquí
 | 11 | `paso-11-middleware` | Middleware: un interceptor para todas las peticiones |
 | 12 | `paso-12-seguridad` | Spring Security: autenticación vs autorización |
 | 13 | `paso-13-jwt` | JWT: tokens Bearer con scopes |
@@ -28,32 +28,47 @@ Las rutas sueltas (`/torres`, `/torres/aleatoria`) se convierten en una API REST
 
 ## Concepto
 
-Reglas de diseño del curso de APIs aplicadas aquí:
+**DTO (Data Transfer Object)**: objetos que definen el contrato de la API, separados de la entidad de la base de datos.
 
-- **Recursos como sustantivos en plural**: `/torres`, nunca `/getTorres` ni `/crearTorre`. El **verbo lo pone el método HTTP**.
-- **Versión desde el inicio**: `/api/v1/...`, para evolucionar sin romper a los clientes.
-- **Path param** para identificar un recurso (`/torres/3`); **query param** para filtrar (`?costoMaximo=250`); **body JSON** para enviar datos.
-- **El código de estado correcto** para cada resultado.
+- `TorreRequest`: lo que el cliente **envía** (sin `id`).
+- `TorreResponse`: lo que la API **devuelve**.
 
-| Método | Endpoint | Qué hace | Éxito | Error |
-| --- | --- | --- | --- | --- |
-| GET | `/api/v1/torres` | Listar (filtros opcionales `?nombre=` y `?costoMaximo=`) | 200 | — |
-| GET | `/api/v1/torres/{id}` | Consultar una | 200 | 404 |
-| POST | `/api/v1/torres` | Crear | **201** + header `Location` | — |
-| PUT | `/api/v1/torres/{id}` | Reemplazar completa | 200 | 404 |
-| PATCH | `/api/v1/torres/{id}/costo` | Cambiar solo el costo | 200 | 404 |
-| DELETE | `/api/v1/torres/{id}` | Eliminar | **204** sin body | 404 |
+Si mañana la tabla cambia, el contrato no tiene por qué cambiar. Es la regla "no expongas el modelo interno de la base de datos".
 
-`ResponseEntity` es lo que permite elegir el código de estado y los headers de la respuesta.
+**Validación**: anotaciones como `@NotBlank`, `@Positive` y `@Max` en el DTO, y `@Valid` en el controller. Si algo no cumple, Spring rechaza la petición antes de llegar al servicio.
+
+**Manejo centralizado de errores**: el servicio lanza excepciones de negocio (`TorreNoEncontradaException`, `TorreDuplicadaException`) y un `@RestControllerAdvice` las traduce a códigos HTTP con un cuerpo uniforme:
+
+```json
+{
+  "error": "BAD_REQUEST",
+  "mensaje": "El nombre es obligatorio",
+  "campo": "nombre",
+  "path": "/api/v1/torres",
+  "timestamp": "2026-10-30T19:30:00Z"
+}
+```
+
+| Situación | Excepción | Código |
+| --- | --- | --- |
+| Campo inválido | `MethodArgumentNotValidException` (la lanza `@Valid`) | 400 |
+| JSON mal formado | `HttpMessageNotReadableException` | 400 |
+| La torre no existe | `TorreNoEncontradaException` | 404 |
+| Ya existe una torre con ese nombre | `TorreDuplicadaException` | 409 |
+
+La regla "el nombre debe ser único" es **lógica de negocio**: vive en el servicio, no en el controller.
 
 ## Qué cambió
 
 | Archivo | Cambio |
 | --- | --- |
-| `TorreController.java` | Ahora en `@RequestMapping("/api/v1/torres")` con `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping`, `@PathVariable`, `@RequestParam`, `@RequestBody` y `ResponseEntity` |
-| `TorreService.java` | Nuevos `buscarPorId`, `crear`, `reemplazar`, `cambiarCosto`, `eliminar` |
-| `TorreServiceTest.java` | Nueva prueba: eliminar una torre que no existe |
-| `peticiones/*.json` | Cuerpos de ejemplo para POST, PUT y PATCH |
+| `pom.xml` | Nuevo `spring-boot-starter-validation` |
+| `dto/TorreRequest.java`, `dto/TorreResponse.java`, `dto/CambioCostoRequest.java`, `dto/ErrorResponse.java` | Nuevos records |
+| `error/TorreNoEncontradaException.java`, `error/TorreDuplicadaException.java` | Excepciones de negocio |
+| `error/ManejadorDeErrores.java` | `@RestControllerAdvice` con un `@ExceptionHandler` por tipo de error |
+| `TorreService.java` | Lanza excepciones en lugar de devolver `Optional`; valida nombre único |
+| `TorreController.java` | Usa DTOs y `@Valid`; ya no decide los 404 a mano y queda más corto |
+| `TorreServiceTest.java` | Pruebas de 404 y 409 |
 
 ## Desde cero
 
@@ -62,10 +77,10 @@ Reglas de diseño del curso de APIs aplicadas aquí:
 ```bash
 git clone https://github.com/amr205/workshop-java-springbatch.git
 cd workshop-java-springbatch
-git checkout paso-9-api-rest
+git checkout paso-10-dtos-y-errores
 ```
 
-Si ya lo tienes clonado: `git checkout paso-9-api-rest`.
+Si ya lo tienes clonado: `git checkout paso-10-dtos-y-errores`.
 
 ### 2. Arrancar la aplicación
 
@@ -80,27 +95,23 @@ Déjala corriendo y abre **otra terminal** en la misma carpeta para las pruebas.
 Los comandos usan `curl`. En **PowerShell escribe `curl.exe`** (con `.exe`); el resto del comando es igual. `-i` muestra el código de estado y los headers de la respuesta. Los cuerpos JSON están en la carpeta `peticiones/` y se envían con `-d "@archivo"`, así no hay problemas con las comillas en Windows.
 
 ```bash
-curl -i http://localhost:9090/api/v1/torres
-curl -i "http://localhost:9090/api/v1/torres?costoMaximo=250"
-curl -i http://localhost:9090/api/v1/torres/1
-curl -i http://localhost:9090/api/v1/torres/99                                                               # 404
-curl -i -X POST -H "Content-Type: application/json" -d "@peticiones/nueva-torre.json" http://localhost:9090/api/v1/torres         # 201 + Location
-curl -i -X PUT -H "Content-Type: application/json" -d "@peticiones/reemplazo-torre.json" http://localhost:9090/api/v1/torres/2
-curl -i -X PATCH -H "Content-Type: application/json" -d "@peticiones/cambio-costo.json" http://localhost:9090/api/v1/torres/3/costo
-curl -i -X DELETE http://localhost:9090/api/v1/torres/1                                                      # 204
-curl -i -X DELETE http://localhost:9090/api/v1/torres/1                                                      # 404: ya no existe
+curl -i -X POST -H "Content-Type: application/json" -d "@peticiones/nueva-torre.json" http://localhost:9090/api/v1/torres       # 201
+curl -i -X POST -H "Content-Type: application/json" -d "@peticiones/nueva-torre.json" http://localhost:9090/api/v1/torres       # 409: el nombre ya existe
+curl -i -X POST -H "Content-Type: application/json" -d "@peticiones/torre-invalida.json" http://localhost:9090/api/v1/torres    # 400: campo nombre
+curl -i -X POST -H "Content-Type: application/json" -d "esto no es json" http://localhost:9090/api/v1/torres                    # 400: JSON inválido
+curl -i http://localhost:9090/api/v1/torres/99                                                             # 404 con cuerpo JSON
 ```
 
-Fíjate en la primera línea de cada respuesta (`HTTP/1.1 201`, `204`, `404`…) y en el header `Location` del POST.
+### 4. Pruebas automáticas
 
-## Lo que todavía está mal (se arregla en el paso 10)
+```bash
+mvn test
+```
 
-1. La API recibe y devuelve la **entidad JPA** (`Torre`) directamente: expone el modelo interno.
-2. No hay validación. Prueba `curl -i -X POST -H "Content-Type: application/json" -d "@peticiones/torre-invalida.json" http://localhost:9090/api/v1/torres`: crea una torre sin nombre y con daño negativo.
-3. El 404 llega **sin body**: el cliente no sabe qué pasó.
+Deben pasar 7 pruebas.
 
 ## Pregunta para la clase
 
-¿Por qué `POST /api/v1/torres` es mejor que `POST /crearTorre`? ¿Cuándo usas PUT y cuándo PATCH?
+¿Por qué no conviene devolver la entidad JPA directamente? ¿"Verificar que el nombre sea único" es lógica de negocio o tecnológica?
 
-Siguiente paso: `git checkout paso-10-dtos-y-errores`
+Siguiente paso: `git checkout paso-11-middleware`

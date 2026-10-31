@@ -1,11 +1,17 @@
 package com.workshop.torres;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Random;
 
 import org.springframework.stereotype.Service;
 
+import com.workshop.torres.error.TorreDuplicadaException;
+import com.workshop.torres.error.TorreNoEncontradaException;
+
+/**
+ * Las reglas de negocio lanzan excepciones; el ManejadorDeErrores
+ * las traduce a codigos HTTP. El servicio no sabe nada de HTTP.
+ */
 @Service
 public class TorreService {
 
@@ -22,37 +28,39 @@ public class TorreService {
         return torreRepository.findAll();
     }
 
-    public Optional<Torre> buscarPorId(Long id) {
-        return torreRepository.findById(id);
+    public Torre buscarPorId(Long id) {
+        return torreRepository.findById(id)
+                .orElseThrow(() -> new TorreNoEncontradaException(id));
     }
 
     public Torre crear(Torre torre) {
-        torre.setId(null);   // el id lo genera la base de datos
+        // Regla de negocio: no puede haber dos torres con el mismo nombre
+        if (!torreRepository.findByNombre(torre.getNombre()).isEmpty()) {
+            throw new TorreDuplicadaException(torre.getNombre());
+        }
+        torre.setId(null);
         return torreRepository.save(torre);
     }
 
-    public Optional<Torre> reemplazar(Long id, Torre datos) {
-        return torreRepository.findById(id).map(torre -> {
-            torre.setNombre(datos.getNombre());
-            torre.setDanio(datos.getDanio());
-            torre.setCosto(datos.getCosto());
-            return torreRepository.save(torre);
-        });
+    public Torre reemplazar(Long id, Torre datos) {
+        Torre torre = buscarPorId(id);
+        torre.setNombre(datos.getNombre());
+        torre.setDanio(datos.getDanio());
+        torre.setCosto(datos.getCosto());
+        return torreRepository.save(torre);
     }
 
-    public Optional<Torre> cambiarCosto(Long id, int costo) {
-        return torreRepository.findById(id).map(torre -> {
-            torre.setCosto(costo);
-            return torreRepository.save(torre);
-        });
+    public Torre cambiarCosto(Long id, int costo) {
+        Torre torre = buscarPorId(id);
+        torre.setCosto(costo);
+        return torreRepository.save(torre);
     }
 
-    public boolean eliminar(Long id) {
+    public void eliminar(Long id) {
         if (!torreRepository.existsById(id)) {
-            return false;
+            throw new TorreNoEncontradaException(id);
         }
         torreRepository.deleteById(id);
-        return true;
     }
 
     public Torre masPoderosa() {

@@ -1,8 +1,8 @@
 package com.workshop.torres;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -16,6 +16,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.workshop.torres.error.TorreDuplicadaException;
+import com.workshop.torres.error.TorreNoEncontradaException;
 
 /**
  * Prueba unitaria: solo TorreService, sin Spring y sin base de datos.
@@ -69,10 +72,18 @@ class TorreServiceTest {
     }
 
     @Test
-    void eliminarUnaTorreQueNoExisteDevuelveFalse() {
+    void eliminarUnaTorreQueNoExisteLanzaNoEncontrada() {
         when(torreRepository.existsById(99L)).thenReturn(false);
 
-        assertFalse(torreService.eliminar(99L));
+        assertThrows(TorreNoEncontradaException.class, () -> torreService.eliminar(99L));
         verify(torreRepository, never()).deleteById(99L);
+    }
+
+    @Test
+    void crearConUnNombreRepetidoLanzaDuplicada() {
+        when(torreRepository.findByNombre("Mago")).thenReturn(List.of(new Torre("Mago", 25, 200)));
+
+        assertThrows(TorreDuplicadaException.class, () -> torreService.crear(new Torre("Mago", 30, 210)));
+        verify(torreRepository, never()).save(any());
     }
 }

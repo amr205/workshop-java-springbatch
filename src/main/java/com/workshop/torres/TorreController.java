@@ -2,7 +2,8 @@ package com.workshop.torres;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
+
+import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -16,9 +17,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.workshop.torres.dto.CambioCostoRequest;
+import com.workshop.torres.dto.TorreRequest;
+import com.workshop.torres.dto.TorreResponse;
+
 /**
- * API REST de torres: recurso en plural, version en la URL
- * y el verbo lo pone el metodo HTTP, no la URL.
+ * El controller solo recibe, valida (@Valid) y delega.
+ * Habla en DTOs: nunca recibe ni devuelve la entidad JPA.
  */
 @RestController
 @RequestMapping("/api/v1/torres")
@@ -30,69 +35,56 @@ public class TorreController {
         this.torreService = torreService;
     }
 
-    // GET /api/v1/torres                    -> todas
-    // GET /api/v1/torres?nombre=Mago        -> filtro por nombre (query param)
-    // GET /api/v1/torres?costoMaximo=250    -> filtro por costo (query param)
     @GetMapping
-    public List<Torre> listar(@RequestParam(required = false) String nombre,
-                              @RequestParam(required = false) Integer costoMaximo) {
+    public List<TorreResponse> listar(@RequestParam(required = false) String nombre,
+                                      @RequestParam(required = false) Integer costoMaximo) {
+        List<Torre> torres;
         if (nombre != null) {
-            return torreService.buscarPorNombre(nombre);
+            torres = torreService.buscarPorNombre(nombre);
+        } else if (costoMaximo != null) {
+            torres = torreService.alcanzables(costoMaximo);
+        } else {
+            torres = torreService.listar();
         }
-        if (costoMaximo != null) {
-            return torreService.alcanzables(costoMaximo);
-        }
-        return torreService.listar();
+        return torres.stream().map(TorreResponse::desde).toList();
     }
 
-    // GET /api/v1/torres/1  -> 200 con la torre, o 404 si no existe (path param)
     @GetMapping("/{id}")
-    public ResponseEntity<Torre> buscar(@PathVariable Long id) {
-        return torreService.buscarPorId(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public TorreResponse buscar(@PathVariable Long id) {
+        return TorreResponse.desde(torreService.buscarPorId(id));
     }
 
-    // POST /api/v1/torres  -> 201 Created + header Location con la URL del recurso nuevo
     @PostMapping
-    public ResponseEntity<Torre> crear(@RequestBody Torre torre) {
-        Torre creada = torreService.crear(torre);
+    public ResponseEntity<TorreResponse> crear(@RequestBody @Valid TorreRequest request) {
+        Torre creada = torreService.crear(new Torre(request.nombre(), request.danio(), request.costo()));
         URI ubicacion = URI.create("/api/v1/torres/" + creada.getId());
-        return ResponseEntity.created(ubicacion).body(creada);
+        return ResponseEntity.created(ubicacion).body(TorreResponse.desde(creada));
     }
 
-    // PUT /api/v1/torres/1  -> reemplaza la torre completa
     @PutMapping("/{id}")
-    public ResponseEntity<Torre> reemplazar(@PathVariable Long id, @RequestBody Torre torre) {
-        return torreService.reemplazar(id, torre)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public TorreResponse reemplazar(@PathVariable Long id, @RequestBody @Valid TorreRequest request) {
+        Torre datos = new Torre(request.nombre(), request.danio(), request.costo());
+        return TorreResponse.desde(torreService.reemplazar(id, datos));
     }
 
-    // PATCH /api/v1/torres/1/costo  -> cambia solo un campo
     @PatchMapping("/{id}/costo")
-    public ResponseEntity<Torre> cambiarCosto(@PathVariable Long id, @RequestBody Map<String, Integer> cambio) {
-        return torreService.cambiarCosto(id, cambio.get("costo"))
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public TorreResponse cambiarCosto(@PathVariable Long id, @RequestBody @Valid CambioCostoRequest request) {
+        return TorreResponse.desde(torreService.cambiarCosto(id, request.costo()));
     }
 
-    // DELETE /api/v1/torres/1  -> 204 No Content (sin body), o 404
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        if (torreService.eliminar(id)) {
-            return ResponseEntity.noContent().build();
-        }
-        return ResponseEntity.notFound().build();
+        torreService.eliminar(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/mas-poderosa")
-    public Torre masPoderosa() {
-        return torreService.masPoderosa();
+    public TorreResponse masPoderosa() {
+        return TorreResponse.desde(torreService.masPoderosa());
     }
 
     @GetMapping("/aleatoria")
-    public Torre aleatoria() {
-        return torreService.aleatoria();
+    public TorreResponse aleatoria() {
+        return TorreResponse.desde(torreService.aleatoria());
     }
 }
