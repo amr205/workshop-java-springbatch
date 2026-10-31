@@ -1,6 +1,6 @@
-# Paso 11: Middleware: un interceptor para todas las peticiones
+# Paso 12: Spring Security: autenticación vs autorización
 
-Un interceptor registra cada petición a la API, mide cuánto tarda y le agrega un id de rastreo, sin tocar ningún controller.
+La API exige usuario y contraseña, y no todos los usuarios pueden hacer lo mismo.
 
 ## Pasos del workshop
 
@@ -16,8 +16,8 @@ Un interceptor registra cada petición a la API, mide cuánto tarda y le agrega 
 | 8 | `paso-8-pruebas` | Pruebas unitarias con JUnit 5 y Mockito |
 | 9 | `paso-9-api-rest` | Diseño de una API REST (CRUD, códigos HTTP) |
 | 10 | `paso-10-dtos-y-errores` | DTOs, validación y errores con estructura |
-| 11 | `paso-11-middleware` | Middleware: un interceptor para todas las peticiones | ← estás aquí
-| 12 | `paso-12-seguridad` | Spring Security: autenticación vs autorización |
+| 11 | `paso-11-middleware` | Middleware: un interceptor para todas las peticiones |
+| 12 | `paso-12-seguridad` | Spring Security: autenticación vs autorización | ← estás aquí
 | 13 | `paso-13-jwt` | JWT: tokens Bearer con scopes |
 
 ## Requisitos
@@ -28,24 +28,37 @@ Un interceptor registra cada petición a la API, mide cuánto tarda y le agrega 
 
 ## Concepto
 
-Un **middleware** es una capa intermedia que intercepta requests y responses antes y después de llegar al endpoint. Sirve para lo que se repite en todos los endpoints: logging, medición de tiempos, ids de correlación y, en el siguiente paso, seguridad.
+| | Autenticación (AuthN) | Autorización (AuthZ) |
+| --- | --- | --- |
+| Pregunta | **¿Quién eres?** | **¿Qué puedes hacer?** |
+| Aquí | Usuario y contraseña con HTTP Basic | Roles `USER` y `ADMIN` |
+| Si falla | **401 Unauthorized** | **403 Forbidden** |
 
-En Spring MVC se implementa con `HandlerInterceptor`:
+**Spring Security** funciona como una cadena de filtros (otro middleware) que revisa cada petición **antes** de que llegue al controller. Se configura con un bean `SecurityFilterChain`.
 
-| Método | Cuándo se ejecuta |
+Reglas de este paso:
+
+| Petición | ¿Quién puede? |
 | --- | --- |
-| `preHandle` | **Antes** del controller. Si devuelve `false`, la petición se detiene ahí |
-| `postHandle` | Después del controller, antes de escribir la respuesta |
-| `afterCompletion` | Al terminar todo, incluso si hubo error |
+| `GET /api/v1/torres/**` | `USER` y `ADMIN` |
+| `POST`, `PUT`, `PATCH`, `DELETE` en `/api/v1/torres/**` | Solo `ADMIN` |
+| `/hola`, `/juego`, `/scopes` | Todos, sin login |
 
-Y se registra en un `WebMvcConfigurer`, indicando a qué rutas aplica.
+| Usuario | Contraseña | Rol |
+| --- | --- | --- |
+| `ana` | `ana123` | USER |
+| `admin` | `admin123` | ADMIN |
+
+Las contraseñas se guardan con **hash** (bcrypt), nunca en texto plano.
+
+**¿Por qué `csrf.disable()`?** CSRF protege formularios con cookie de sesión. Esta API es **stateless** (no guarda sesión), así que no aplica.
 
 ## Qué cambió
 
 | Archivo | Cambio |
 | --- | --- |
-| `web/RegistroInterceptor.java` | `preHandle`: genera un id, agrega el header `X-Request-Id` y registra la petición. `afterCompletion`: registra el código de estado y los milisegundos |
-| `web/WebConfig.java` | Registra el interceptor solo para `/api/**` |
+| `pom.xml` | Nuevo `spring-boot-starter-security` |
+| `seguridad/SeguridadConfig.java` | `SecurityFilterChain` con las reglas, usuarios en memoria y `PasswordEncoder` |
 
 ## Desde cero
 
@@ -54,10 +67,10 @@ Y se registra en un `WebMvcConfigurer`, indicando a qué rutas aplica.
 ```bash
 git clone https://github.com/amr205/workshop-java-springbatch.git
 cd workshop-java-springbatch
-git checkout paso-11-middleware
+git checkout paso-12-seguridad
 ```
 
-Si ya lo tienes clonado: `git checkout paso-11-middleware`.
+Si ya lo tienes clonado: `git checkout paso-12-seguridad`.
 
 ### 2. Arrancar la aplicación
 
@@ -72,28 +85,24 @@ Déjala corriendo y abre **otra terminal** en la misma carpeta para las pruebas.
 Los comandos usan `curl`. En **PowerShell escribe `curl.exe`** (con `.exe`); el resto del comando es igual. `-i` muestra el código de estado y los headers de la respuesta. Los cuerpos JSON están en la carpeta `peticiones/` y se envían con `-d "@archivo"`, así no hay problemas con las comillas en Windows.
 
 ```bash
-curl -i http://localhost:9090/api/v1/torres
-curl -i http://localhost:9090/api/v1/torres/99
-curl -i http://localhost:9090/hola
+curl -i http://localhost:9090/api/v1/torres                                       # 401: no dijiste quién eres
+curl -i -u ana:ana123 http://localhost:9090/api/v1/torres                         # 200
+curl -i -u ana:wrong http://localhost:9090/api/v1/torres                          # 401: contraseña incorrecta
+curl -i -u ana:ana123 -X DELETE http://localhost:9090/api/v1/torres/1             # 403: ana es USER
+curl -i -u admin:admin123 -X DELETE http://localhost:9090/api/v1/torres/1         # 204
+curl -i http://localhost:9090/hola                # 200: ruta pública
 ```
 
-En la **consola de la aplicación** aparece cada petición a la API:
+`-u usuario:contraseña` envía el header `Authorization: Basic ...`. Es solo Base64, **no cifrado**: por eso HTTP Basic solo es aceptable sobre HTTPS.
 
-```
-[3f9a1c2e] --> GET /api/v1/torres
-[3f9a1c2e] <-- 200 /api/v1/torres en 12 ms
-[b71d0e44] --> GET /api/v1/torres/99
-[b71d0e44] <-- 404 /api/v1/torres/99 en 3 ms
-```
+Si abres `http://localhost:9090/api/v1/torres` en el navegador, aparece una ventana pidiendo usuario y contraseña: es el 401 de HTTP Basic.
 
-Las respuestas traen el header `X-Request-Id` con el mismo id. `/hola` no aparece en el log: el interceptor solo aplica a `/api/**`.
+## Lo que no es ideal (se mejora en el paso 13)
 
-## Prueba esto
-
-Cambia el `return true` de `preHandle` por `return false` y llama a la API: la respuesta llega vacía porque el interceptor detuvo la petición antes del controller. Así funciona un middleware de seguridad que rechaza peticiones. Regresa a `true`.
+El cliente envía la **contraseña en cada petición**. Con JWT la envía una sola vez, recibe un token temporal y usa el token.
 
 ## Pregunta para la clase
 
-¿Qué otras cosas pondrías en un middleware en lugar de repetirlas en cada controller?
+¿Cuál es la diferencia entre 401 y 403? Con `ana`, ¿qué peticiones dan cada uno?
 
-Siguiente paso: `git checkout paso-12-seguridad`
+Siguiente paso: `git checkout paso-13-jwt`
