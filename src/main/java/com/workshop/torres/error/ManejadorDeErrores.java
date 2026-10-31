@@ -47,6 +47,12 @@ public class ManejadorDeErrores {
         return respuesta(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "El cuerpo de la peticion no es un JSON valido", null, request);
     }
 
+    // 401: login con usuario o contrasena incorrectos
+    @ExceptionHandler(CredencialesInvalidasException.class)
+    public ResponseEntity<ErrorResponse> credencialesInvalidas(CredencialesInvalidasException ex, HttpServletRequest request) {
+        return respuesta(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", ex.getMessage(), null, request);
+    }
+
     private ResponseEntity<ErrorResponse> respuesta(HttpStatus status, String error, String mensaje,
                                                     String campo, HttpServletRequest request) {
         ErrorResponse cuerpo = new ErrorResponse(error, mensaje, campo, request.getRequestURI(), Instant.now().toString());

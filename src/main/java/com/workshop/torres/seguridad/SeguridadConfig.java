@@ -19,20 +19,20 @@ public class SeguridadConfig {
     @Bean
     public SecurityFilterChain filtroDeSeguridad(HttpSecurity http) throws Exception {
         http
-            // API stateless: no hay formulario ni cookie de sesion, asi que CSRF no aplica
             .csrf(csrf -> csrf.disable())
             .sessionManagement(sesion -> sesion.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // AUTORIZACION (AuthZ): que puede hacer cada rol
+            // AUTORIZACION por SCOPES que vienen dentro del JWT (claim "scope")
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.GET, "/api/v1/torres/**").hasAnyRole("USER", "ADMIN")
-                .requestMatchers("/api/v1/torres/**").hasRole("ADMIN")
+                .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/torres/**").hasAuthority("SCOPE_torres:read")
+                .requestMatchers("/api/v1/torres/**").hasAuthority("SCOPE_torres:write")
                 .anyRequest().permitAll())
-            // AUTENTICACION (AuthN): usuario y contrasena en el header Authorization (HTTP Basic)
-            .httpBasic(Customizer.withDefaults());
+            // AUTENTICACION con Bearer token: cada request trae "Authorization: Bearer <jwt>"
+            // y Spring verifica la firma y la expiracion con el JwtDecoder
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
         return http.build();
     }
 
-    // Usuarios de prueba en memoria. En un sistema real vendrian de una base de datos.
     @Bean
     public UserDetailsService usuarios(PasswordEncoder passwordEncoder) {
         return new InMemoryUserDetailsManager(
@@ -40,7 +40,6 @@ public class SeguridadConfig {
                 User.withUsername("admin").password(passwordEncoder.encode("admin123")).roles("ADMIN").build());
     }
 
-    // Las contrasenas nunca se guardan en texto plano: se guardan con hash (bcrypt)
     @Bean
     public PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
