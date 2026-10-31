@@ -1,13 +1,11 @@
 package com.workshop.torres;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 
 import org.springframework.stereotype.Service;
 
-/**
- * Capa de negocio. Ahora delega las consultas al repositorio JPA.
- */
 @Service
 public class TorreService {
 
@@ -22,6 +20,39 @@ public class TorreService {
 
     public List<Torre> listar() {
         return torreRepository.findAll();
+    }
+
+    public Optional<Torre> buscarPorId(Long id) {
+        return torreRepository.findById(id);
+    }
+
+    public Torre crear(Torre torre) {
+        torre.setId(null);   // el id lo genera la base de datos
+        return torreRepository.save(torre);
+    }
+
+    public Optional<Torre> reemplazar(Long id, Torre datos) {
+        return torreRepository.findById(id).map(torre -> {
+            torre.setNombre(datos.getNombre());
+            torre.setDanio(datos.getDanio());
+            torre.setCosto(datos.getCosto());
+            return torreRepository.save(torre);
+        });
+    }
+
+    public Optional<Torre> cambiarCosto(Long id, int costo) {
+        return torreRepository.findById(id).map(torre -> {
+            torre.setCosto(costo);
+            return torreRepository.save(torre);
+        });
+    }
+
+    public boolean eliminar(Long id) {
+        if (!torreRepository.existsById(id)) {
+            return false;
+        }
+        torreRepository.deleteById(id);
+        return true;
     }
 
     public Torre masPoderosa() {

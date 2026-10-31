@@ -1,7 +1,9 @@
 package com.workshop.torres;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -64,5 +66,13 @@ class TorreServiceTest {
         torreService.alcanzables(250);
 
         verify(torreRepository).findByCostoLessThanEqual(250);
+    }
+
+    @Test
+    void eliminarUnaTorreQueNoExisteDevuelveFalse() {
+        when(torreRepository.existsById(99L)).thenReturn(false);
+
+        assertFalse(torreService.eliminar(99L));
+        verify(torreRepository, never()).deleteById(99L);
     }
 }
